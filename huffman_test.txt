@@ -1,0 +1,7 @@
+This is a test file
+for Huffman Coding implementation.
+Don't worry - i just want to check
+			1234567890
+	0987654321
+	
+	
