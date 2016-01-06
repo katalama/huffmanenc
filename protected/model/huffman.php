@@ -1,11 +1,32 @@
 <?php
 
+/**
+ * 
+ */
 class HuffmanCodingTreeNode {
+    /**
+     * code - кодируемая последовательность
+     */
     public $code;
+    /**
+     * freq - Частота комбинации code во входном файле
+     */
     public $freq = null;
+    
+    /**
+     * leftChild/rightChild - левое/правое поддерево
+     */
     public $leftChild = null;
     public $rightChild = null;
+    
+    /**
+     * parent - родительский узел
+     */
     public $parent = null;
+    
+    /**
+     * bit - направление спуска от родительского узла 1/0
+     */
     public $bit;
     
     public function __construct($code, $freq) {
@@ -13,6 +34,10 @@ class HuffmanCodingTreeNode {
         $this->freq = $freq;
     }
     
+    /**
+     * Комбинирует узел с другим
+     * Результат - родительский узел для обоих
+     */
     public function combine($anotherNode) {
         $newNode = new HuffmanCodingTreeNode(null, $this->freq + $anotherNode->freq);
         $newNode->leftChild = $this;
@@ -23,22 +48,62 @@ class HuffmanCodingTreeNode {
     }
 }
 
+class HuffmanException extends Exception {
+    // pass
+}
 
+/**
+ * Класс для кодирования/декодирования данных методом Хаффмана
+ */
 class Huffman
 {
     const OPERATION_ENCODE = 1;
     const OPERATION_DECODE = 2;
     const FILE_PREFIX = 'ktlm';
 
+    /**
+     * Процент завершенности текущей операции (кодирования/декодирования)
+     */
     public $percentComplete;
+    /**
+     * Текущая выполняемая операция: кодирование/декодирование
+     */
     public $operation;
     
+    /**
+     * Размер кодируемой последовательности (в байтах)
+     */
     private $_tokenLength;
+    
+    /**
+     * Путь к входному файлу
+     */
     private $_inFilePath = null;
+    
+    /**
+     * Путь к выходному файлу
+     */
     private $_outFilePath = null;
+    
+    /**
+     * Файловый дескриптор входного файла
+     */
     private $_fileHandle = null;
+    
+    /**
+     * Массив "листьев" дерева кодирования - элементы таблицы кодирования
+     */
     private $_leaves = null;
+    
+    /**
+     * Корневой узел дерева кодирования
+     */
     private $_rootNode = null;
+    
+    /**
+     * Кодовая таблица. 
+     * Содержит кодируемые последовательности с частотами вхождения
+     */
     private $_codingTable = null;
     
     public function __construct($filePath, $tokenLength = 1){
@@ -64,6 +129,10 @@ class Huffman
 		return $this->_inFilePath;
 	}
 
+    /**
+     * Считает частоты кодируемых последовательностей во входном файле
+     * Возвращает массив листьев кодового дерева
+     */
     private function _getFrequencyTable() {
         $freqTable = [];
         while (true) {
@@ -83,6 +152,9 @@ class Huffman
         $this->_leaves->rewind();
     }
     
+    /**
+     * Строит кодовое дерево по массиву листьев
+     */
     public function _buildCodingTree() {
         if(!$this->_leaves)
             $this->_getFrequencyTable();
@@ -100,6 +172,9 @@ class Huffman
         }
     }
     
+    /**
+     * Выбирает наименьший (по частоте) элемент из массивов листьев и узлов
+     */
     private function _getLeast($leaves, $nodes){
         $leaf = $leaves->current(); // can be null
         $node = $nodes->current(); // is not null
@@ -117,6 +192,10 @@ class Huffman
         return $least;
     }
     
+    /**
+     * По кодовому дереву определяет кодирующие последовательности 
+     * для кодируемых последовательностей
+     */
     public function getCodingTable( $asArray=false ){
         if (!$this->_rootNode) 
             $this->_buildCodingTree();
@@ -144,7 +223,10 @@ class Huffman
 
         return $codingTableStr;
     }
-        
+    
+    /**
+     * Кодирует данные из входного файла согласно кодовой таблице
+     */
     private function _encodeData($outFileHandle){
         $codingTable = $this->getCodingTable(true);
         fseek($this->_fileHandle, 0);
@@ -184,14 +266,25 @@ class Huffman
                 throw new Exception("Coding table is not correct [$c]");
             }
         }
+        
+        // Last word would be filled by zero bits for alignment
         $currentWord <<= $bitsRemain;
         fwrite($outFileHandle, pack('N',$currentWord));
         
+        // Need to save count of trailing zero bits
         fseek($outFileHandle, $positionForTrailinZeroBitsCount);
         fwrite($outFileHandle, pack('c', $bitsRemain));
         fseek($outFileHandle, 0, SEEK_END);
     }
     
+    /**
+     * Создает закодированный файл.
+     * В файл записываются 
+     *      - информация о формате кодирования
+     *      - размер кодируемой последовательности
+     *      - кодовая таблица
+     *      - закодированное сообщение
+     */
     public function encode(){
         $this->operation = Huffman::OPERATION_ENCODE;
 
@@ -210,6 +303,10 @@ class Huffman
         fclose($outFileHandle);
     }
 
+    /**
+     * Строит кодовое дерево для декодирования по кодовой таблице из файла
+     * Возвращает корневой узел кодового дерева
+     */
     private function _buildDecodingTree( $codingTable, $depth=1 ){
         $rootNode = new HuffmanCodingTreeNode(null, 0);
         if (count($codingTable)==1){
@@ -233,7 +330,10 @@ class Huffman
         return $rootNode;
     }
 
-    private function _extractCodingTable($asArray = false){
+    /**
+     * Извлекает кодовую таблицу из закодированного файла
+     */
+    private function _extractCodingTable(){
         // 1 byte for token length
         $tokenLength = ord(fread($this->_fileHandle, 1));
         // 4 bytes for coding table size
@@ -250,6 +350,9 @@ class Huffman
         return $codingTable;
     }
     
+    /**
+     * Декодирует входной файл.
+     */
     public function decode(){
         $this->operation = Huffman::OPERATION_DECODE;
         
@@ -269,6 +372,12 @@ class Huffman
         fclose($outFileHandle);
     }
     
+    /**
+     * Декодирует данные
+     *      - извлекается кодовая таблица (строится дерево)
+     *      - считывается количество концевых битов 
+     *      - считывается и декодируется кодовое сообщение
+     */
     private function _decodeData($outFileHandle) {
         $codingTable = $this->_extractCodingTable();
         
@@ -277,6 +386,7 @@ class Huffman
         // 1 byte for trailing zero bits
         $trailingBits = ord(fread($this->_fileHandle, 1));
         
+        // calculate encoded data size
         $encodedStartPos = ftell($this->_fileHandle);
         fseek($this->_fileHandle, 0, SEEK_END);
         $encodedSize = ftell($this->_fileHandle) - $encodedStartPos;
@@ -305,18 +415,20 @@ if($this->percentComplete >= $nextShowedPercent) {
 
                 if($encodedLeft > 0)
                     $nextWord = unpack('N', fread($this->_fileHandle, 4))[1];
+                
                 $encodedLeft -= 4;
             }
             
             $currentBit = ($currentWord & (1<<($currentOffset - 1))) >> ($currentOffset - 1);
+            // Move down about coding tree untill reach a leaf
             $currentNode = $currentBit ? $currentNode->leftChild : $currentNode->rightChild;
             $currentOffset -= 1;
             
+            // Leaf is reached
             if ($currentNode->code !== null) {
                 fwrite($outFileHandle, $currentNode->code);
                 $currentNode = $decodingTree;
             }
-            
         }
     }
 }

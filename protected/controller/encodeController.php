@@ -1,17 +1,18 @@
 <?php
+
 include "../protected/model/huffman.php";
 
-$max_file_size = 3*1024*1024; // 3 Mb
+$maxFileSize = 2*1024*1024; // 2 Mb
 $filesDir = '../files/';
 
-// trying get downloaded file
-if ($_FILES["filename"]["size"] > $max_file_size) {
-	$error = "File size exceed limit [3Mb]";
+// Check size
+if ($_FILES["filename"]["size"] > $maxFileSize) {
+	$error = "File size exceed limit [$maxFileSize]";
 	include "../protected/view/form.php";
 	exit;
 }
 
-// Проверяем загружен ли файл
+// Check if the file downloaded
 if (is_uploaded_file($_FILES["filename"]["tmp_name"])) {
 	$uploadedFilePath = $filesDir.$_FILES["filename"]["name"];
 	move_uploaded_file($_FILES["filename"]["tmp_name"], $uploadedFilePath);
