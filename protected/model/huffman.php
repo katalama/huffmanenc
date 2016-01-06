@@ -34,14 +34,15 @@ class Huffman
     public $operation;
     
     private $_tokenLength;
-    private $_filePath = null;
+    private $_inFilePath = null;
+    private $_outFilePath = null;
     private $_fileHandle = null;
     private $_leaves = null;
     private $_rootNode = null;
     private $_codingTable = null;
     
     public function __construct($filePath, $tokenLength = 1){
-        $this->_filePath = $filePath;
+        $this->_inFilePath = $filePath;
         $this->_tokenLength = $tokenLength;
         
         if (file_exists($filePath)) {
@@ -54,6 +55,14 @@ class Huffman
         else 
             throw new Exception("File [$filePath] is not exists");
     }
+
+	public function getOutFilePath(){
+		return $this->_outFilePath;
+	}
+
+	public function getInFilePath(){
+		return $this->_inFilePath;
+	}
 
     private function _getFrequencyTable() {
         $freqTable = [];
@@ -185,8 +194,9 @@ class Huffman
     
     public function encode(){
         $this->operation = Huffman::OPERATION_ENCODE;
-        
-        $outFileHandle = fopen( $this->_filePath.'.compressed', 'wb');
+
+        $this->_outFilePath = $this->_inFilePath.'.encoded';
+        $outFileHandle = fopen( $this->_outFilePath, 'wb');
         
         fwrite($outFileHandle, Huffman::FILE_PREFIX);
         fwrite($outFileHandle, chr($this->_tokenLength));
@@ -249,11 +259,12 @@ class Huffman
             throw new Exception("File is not a valid KTLM Huffman encoded file.");
         }
         
-        $outFileHandle = fopen($this->_filePath.'.decoded', 'wb');
+        $this->_outFilePath = $this->_inFilePath.'.decoded';
+        $outFileHandle = fopen($this->_outFilePath, 'wb');
         if ($outFileHandle) 
             $this->_decodeData($outFileHandle);
         else
-            throw new Exception("Can not open file [{$this->_filePath}.decoded] for write.");
+            throw new Exception("Can not open file [{$this->_inFilePath}.decoded] for write.");
         
         fclose($outFileHandle);
     }
@@ -308,23 +319,4 @@ if($this->percentComplete >= $nextShowedPercent) {
             
         }
     }
-    
 }
-
-$filePath = 'huffman_test.txt';
-$huffman = new Huffman($filePath);
-
-echo "encoding\n";
-$time = microtime(true);
-$huffman->encode();
-echo "encoded [".(microtime(true) - $time)."]\n";
-
-$filePath = 'huffman_test.txt.compressed';
-$huffman = new Huffman($filePath);
-
-echo "decoding\n";
-$time = microtime(true);
-$huffman->decode();
-echo "decoded [".(microtime(true) - $time)."]\n";
-
-//echo printf('%1b %2b %3b %4b', 0x80, 0x09, 0xE5, 0xD5);
