@@ -14,7 +14,7 @@ if ($_FILES["filename"]["size"] > $maxFileSize) {
 
 // Check if the file downloaded
 if (is_uploaded_file($_FILES["filename"]["tmp_name"])) {
-	$uploadedFilePath = $filesDir.$_FILES["filename"]["name"];
+	$uploadedFilePath = $filesDir.basename($_FILES["filename"]["name"]);
 	move_uploaded_file($_FILES["filename"]["tmp_name"], $uploadedFilePath);
 }
 else {
