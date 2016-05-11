@@ -1,0 +1,51 @@
+<?php
+
+/**
+ * 
+ */
+class HuffmanCodingTreeNode {
+    /**
+     * code - кодируемая последовательность
+     */
+    public $code;
+    /**
+     * freq - Частота комбинации code во входном файле
+     */
+    public $freq = null;
+    
+    /**
+     * leftChild/rightChild - левое/правое поддерево
+     */
+    public $leftChild = null;
+    public $rightChild = null;
+    
+    /**
+     * parent - родительский узел
+     */
+    public $parent = null;
+    
+    /**
+     * bit - направление спуска от родительского узла 1/0
+     */
+    public $bit;
+    
+    public function __construct($code, $freq) {
+        $this->code = $code;
+        $this->freq = $freq;
+    }
+    
+    /**
+     * Комбинирует узел с другим
+     * Результат - родительский узел для обоих
+     */
+    public function combine($anotherNode) {
+        $newNode = new HuffmanCodingTreeNode(null, $this->freq + $anotherNode->freq);
+        $newNode->leftChild = $this;
+        $newNode->rightChild = $anotherNode;
+        $this->parent = $anotherNode->parent = $newNode;
+        $this->bit = !$anotherNode->bit = true;
+        return $newNode;
+    }
+}
+
+?>
