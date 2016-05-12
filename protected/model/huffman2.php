@@ -50,20 +50,44 @@ class HuffmanCodingTreeNode {
 
 class Huffman2 {
     
-    public $_freqTable;
-    public $_tokenLength;
-    public $_fileHandle;
-    public $_leaves;
-    public $_rootNode;
-    public $_codingTable;
+    protected $_freqTable;
+    protected $_tokenLength;
+    protected $_srcFileHandle;
+    protected $_leaves;
+    protected $_rootNode;
+    protected $_codingTable;
+    
+    const OPERATION_ENCODE = 1;
+    const OPERATION_DECODE = 2;
     
     public function __construct( $freqTable = null, $tokenLength = 1 ){
-        if ($this->_freqTable) 
+        if ($freqTable) 
             $this->setFreqTable($freqTable);
         else 
-            $this->setTokenLength($tokenLength);
+            $this->_setTokenLength($tokenLength);
     }
     
+    public function getFreqTable(){
+        if (!$this->_freqTable) {
+            if ($this->_srcFileHandle) {
+                $this->_freqTable = [];
+                while (true) {
+                    $token = fread($this->_srcFileHandle, $this->_tokenLength);
+                    if ( !feof($this->_srcFileHandle) || $token )
+                        $this->_freqTable[$token] = isset($this->_freqTable[$token]) ? $this->_freqTable[$token] + 1 : 1;
+                    else 
+                        break;
+                }
+                asort($this->_freqTable);
+            }
+            else {
+                throw new Exception('Frequency table is not set and also source is not defined');
+            }
+        }
+        
+        return $this->_freqTable;
+    }
+
     public function setFreqTable($freqTable){
         // checks
         if (is_array($freqTable)) {
@@ -73,7 +97,20 @@ class Huffman2 {
         }
     }
     
-    public function setTokenLength($tokenLength){
+    protected function setOperation( $operation ){
+        if ($operation != self::OPERATION_ENCODE && $operation != self::OPERATION_DECODE){
+            return false;
+        }
+        
+        $this->_operation = $operation;
+        return true;
+    }
+
+    public function getOperation(){
+        return $this->_operation;
+    }
+    
+    private function _setTokenLength($tokenLength){
         // checks
         if (intval($tokenLength)){
             $this->_tokenLength = intval($tokenLength);
@@ -84,43 +121,22 @@ class Huffman2 {
         $this->_sourceType = gettype($source);
         
         if ($this->_sourceType == 'resource'){
-            $this->_fileHandle = $source;
+            $this->_srcFileHandle = $source;
         }
         elseif ($this->_sourceType == 'string') {
-            $this->_fileHandle = tmpfile();
-            fwrite($this->_fileHandle, $source);
-            fseek($this->_fileHandle, 0);
+            $this->_srcFileHandle = tmpfile();
+            fwrite($this->_srcFileHandle, $source);
+            fseek($this->_srcFileHandle, 0);
         }
         else {
             throw new Exception('Error! Source must be a file or a string.');
         }
         
-        if ($this->_fileHandle && !$this->_freqTable){
+        if ($this->_srcFileHandle && !$this->_freqTable){
             $this->getFreqTable();
         }
     }
     
-    public function getFreqTable(){
-        if (!$this->_freqTable) {
-            if ($this->_fileHandle) {
-                $this->_freqTable = [];
-                while (true) {
-                    $token = fread($this->_fileHandle, $this->_tokenLength);
-                    if ( !feof($this->_fileHandle) || $token )
-                        $this->_freqTable[$token] = isset($this->_freqTable[$token]) ? $this->_freqTable[$token] + 1 : 1;
-                    else 
-                        break;
-                }
-                asort($this->_freqTable);
-            }
-            else {
-                throw new Exception('Can\'t get frequency table');
-            }
-        }
-        
-        return $this->_freqTable;
-    }
-
     public function _getLeaves(){
         if (!$this->_leaves) {
             $freqTable = $this->getFreqTable();
@@ -199,19 +215,19 @@ class Huffman2 {
         return $this->_codingTable;
     }
 
-    // return [data, trailing_zero_bits]
+    // return [data, trailingBits]
     private function _encode(){
         $outFileHandle = tmpfile();
         
         $codingTable = $this->getCodingTable();
-        fseek($this->_fileHandle, 0);
+        fseek($this->_srcFileHandle, 0);
         
         $currentWord = 0;
         $bitsRemain = 32;
 
         while (true) {
-            $token = fread($this->_fileHandle, $this->_tokenLength);
-            if ( feof($this->_fileHandle) && !$token )
+            $token = fread($this->_srcFileHandle, $this->_tokenLength);
+            if ( feof($this->_srcFileHandle) && !$token )
                 break;
                 
             if (isset($codingTable[$token])) {
@@ -233,63 +249,36 @@ class Huffman2 {
                 $bitsRemain -= $entity['bits'];
             }
             else {
-                throw new Exception("Coding table is not correct [$c]");
+                throw new Exception("Coding table is not correct: there is no code for ['$token']");
             }
         }
         
         // Last word would be filled by zero bits for alignment
         $currentWord <<= $bitsRemain;
         fwrite($outFileHandle, pack('N',$currentWord));
-        
-        // Need to save count of trailing zero bits
         fseek($outFileHandle, 0);
         
         return ['data' => $outFileHandle, 'trailingBits' => $bitsRemain];
     }
-    
-    public function encode($source = null){
-        if ($source)
-            $this->setSource($source);
-        
-        $encoded = $this->_encode();
-        if ($this->_sourceType == 'string') {
-            $meta = stream_get_meta_data($encoded['data']);
-            $encoded['data'] = file_get_contents($meta['uri']);
-        }
 
-        return $encoded;
-    }
-
-    public function decode($source = null, $trailingBits){
-        if ($source)
-            $this->setSource($source);
-        
-        $encoded = $this->_decode($trailingBits);
-        if ($this->_sourceType == 'string') {
-            $meta = stream_get_meta_data($encoded);
-            $encoded = file_get_contents($meta['uri']);
-        }
-
-        return $encoded;
-    }
-    
+    // return [data]
     private function _decode($trailingBits) {
         $outFileHandle = tmpfile();
-        fseek($this->_fileHandle, 0);
+        fseek($this->_srcFileHandle, 0);
         
         $currentNode = $this->_rootNode;
         $currentOffset = 0;
-        $nextWord = unpack('N', fread($this->_fileHandle, 4))[1];
+        $nextWord = unpack('N', fread($this->_srcFileHandle, 4))[1];
 
         while (true) {
-            if ( feof($this->_fileHandle) && $currentOffset==$trailingBits )
+            if ( feof($this->_srcFileHandle) && $currentOffset==$trailingBits )
                 break;
             
             if ($currentOffset == 0) {
                 $currentWord = $nextWord;
                 $currentOffset = 32;
 
-                $nextWord = @unpack('N', fread($this->_fileHandle, 4))[1];
+                $nextWord = @unpack('N', fread($this->_srcFileHandle, 4))[1];
             }
             
             $currentBit = ($currentWord & (1<<($currentOffset - 1))) >> ($currentOffset - 1);
@@ -303,17 +292,72 @@ class Huffman2 {
                 $currentNode = $this->_rootNode;
             }
         }
-        return $outFileHandle;
+        return ['data' => $outFileHandle];
+    }
+
+    private function _process($source = null, $trailingBits = null) {
+        if (empty($this->_operation))
+            throw new Exception('Operation (encode/decode) is undefined');
+        
+        if ($source)
+            $this->setSource($source);
+        
+        if (!$this->_srcFileHandle)
+            throw new Exception('Source is undefined');
+        
+        if (!$this->getCodingTable())
+            throw new Exception('Can\'t get coding table');
+        
+        if ($this->_operation == self::OPERATION_ENCODE)
+            $processed = $this->_encode();
+        else 
+            $processed = $this->_decode($trailingBits);
+        
+        if ($this->_sourceType == 'string') {
+            $meta = stream_get_meta_data($processed['data']);
+            $processed['data'] = file_get_contents($meta['uri']);
+        }
+
+        return $processed;
+    }
+    
+    public function encode($source = null){
+        $this->setOperation(self::OPERATION_ENCODE);
+        try {
+            $processed = $this->_process($source);
+            return $processed;
+        } catch (Exception $e) {
+            echo "Error: ".$e->getMessage().PHP_EOL;
+        }
+        
+        return false;
+    }
+    
+    public function decode($source = null, $trailingBits = null){
+        $this->setOperation(self::OPERATION_DECODE);
+        try {
+            if ($trailingBits===null)
+                throw new Exception('Trailing bits count must be defined for decode procedure');
+            
+            $processed = $this->_process($source, $trailingBits);
+            return $processed['data'];
+        } catch (Exception $e) {
+            echo "Error: ".$e->getMessage().PHP_EOL;
+        }
+        
+        return false;
     }
 }
 
+
 // test
-$h = new huffman2();
+$h = new huffman2(); 
+$src = 'To be or not to be - that is the question!To be or not to be - that is the question!To be or not to be - that is the question!';
 
-$dec = 'to be or not to be - that is the question!';
+$enc = $h->encode($src);
+$dec = $h->decode($enc['data'], $enc['trailingBits']);
+
+var_dump($src);
 var_dump($dec);
+var_dump($dec == $src);
 
-$encoded = $h->encode($dec);
-
-$dec = $h->decode($encoded['data'], $encoded['trailingBits']);
-var_dump($dec);
