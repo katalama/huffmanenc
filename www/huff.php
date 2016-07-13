@@ -36,10 +36,16 @@ class Node {
 				background:lightgray;
 				display:block;
 				text-align:center;
+				padding:10px;
+				border:1px solid;
+				border-radius:153px;
+			}
+			.leaf {
+				background: lightblue;
 			}
 		</style>
 		<div class="node">
-			<span class="title">'.$this->value.'['.$this->token.']</span>'.
+			<span class="title '.($this->token ? 'leaf' : '').'">'.$this->token.'['.$this->value.']</span>'.
 			($this->left ? $this->left->dump() : '<div class="end"></div>').
 			($this->right ? $this->right->dump() : '<div class="end"></div>').
 		'</div>';
@@ -101,16 +107,17 @@ function encode($data, $codingTable){
 	);
 }
 
-$source = 'abracadabra';
+$source = $_GET['source'];
 
 $freqTable = getFrequencyTable($source);
 
 $codingTree = getCodingTree($freqTable);
-echo $codingTree->dump();
 
 
 $codingTable = getCodingTable($codingTree);
 
 $encoded = encode($source, $codingTable);
 
-var_dump($encoded);
+echo $source.'<br>'.$encoded.'<br>';
+echo '<hr>';
+echo $codingTree->dump();
