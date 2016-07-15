@@ -1,123 +1,64 @@
 <?php
 
-function getFrequencyTable( $source ) {
-	return array_count_values(str_split($source));
-}
+include 'huff_lib.php';
 
-class Node {
-	public $left = null;
-	public $right = null;
-	public $token = null;
-	public $value = null;
-	
-	public function __construct($token = null, $value = null) {
-		$this->token = $token;
-		$this->value = $value;
-	}
-	
-	public function combine($node) {
-		$newNode = new Node(null, $this->value + $node->value);
-		$newNode->right = $this;
-		$newNode->left = $node;
-		
-		return $newNode;
-	}
-	
-	public function dump() {
-		return '
-		<style>
-			.node {
-				width:50%;
-				height:80%;
-				float:left;
-			}
-			
-			.title {
-				background:lightgray;
-				display:block;
-				text-align:center;
-				padding:10px;
-				border:1px solid;
-				border-radius:153px;
-			}
-			.leaf {
-				background: lightblue;
-			}
-		</style>
-		<div class="node">
-			<span class="title '.($this->token ? 'leaf' : '').'">'.$this->token.'['.$this->value.']</span>'.
-			($this->left ? $this->left->dump() : '<div class="end"></div>').
-			($this->right ? $this->right->dump() : '<div class="end"></div>').
-		'</div>';
-	}
-}
 
-function getCodingTree( $frequencyTable ) {
-	asort($frequencyTable);
-	
-	$nodes = new ArrayIterator();
-	$leaves = new ArrayIterator();
-	
-	foreach ($frequencyTable as $key=>$value)
-		$leaves->append(new Node($key, $value));
-	
-	while (true) {
-		$firstNode = getLeast($nodes, $leaves);
-		$secondNode = getLeast($nodes, $leaves);
 
-		if ($firstNode && $secondNode) 
-			$nodes->append($firstNode->combine($secondNode));
-		else 
-			return $firstNode ?: $secondNode;
-	}
-}
-    
-function getLeast($list1, $list2){
-	$item1 = $list1->current(); 
-	$item2 = $list2->current();
-	
-	if (!$item1) 
-		$source = $list2;
-	elseif (!$item2) 
-		$source = $list1;
-	else 
-		$source = ($item1->value <= $item2->value) ? $list1 : $list2;
-
-	$least = $source->current();
-	$source->next();
-
-	return $least;
-}
-
-function getCodingTable($root, $code = '') {
-	if (!$root->left && !$root->right)
-		return [$root->token => $code];
-	
-	return array_merge(
-		getCodingTable($root->left, $code.'1'), 
-		getCodingTable($root->right, $code.'0')
-	);
-}
-
-function encode($data, $codingTable){
-	return str_replace(
-		array_keys($codingTable), 
-		array_values($codingTable), 
-		$data
-	);
-}
 
 $source = $_GET['source'];
+if (!$source)
+	exit();
 
+
+
+echo '<pre>';
 $freqTable = getFrequencyTable($source);
+echo "Frequency table: <br>";
+print_r($freqTable);
+
 
 $codingTree = getCodingTree($freqTable);
-
+//print_r($codingTree);
+echo '<div class="clear">'.$codingTree->dump().'</div>';
 
 $codingTable = getCodingTable($codingTree);
+echo "Coding table: <br>";
+print_r($codingTable);
+
+echo '</pre>';
 
 $encoded = encode($source, $codingTable);
 
-echo $source.'<br>'.$encoded.'<br>';
+$source_size = strlen($source)*8;
+$enc_size = strlen($encoded);
+
+
+echo "<style>
+		.clear {
+			clear: both;
+		}
+		
+		.node {
+			width:50%;
+			height:80%;
+			float:left;
+		}
+		
+		.title {
+			background:lightgray;
+			display:block;
+			text-align:center;
+			padding:10px;
+			border:1px solid;
+			border-radius:153px;
+		}
+		.leaf {
+			background: lightblue;
+		}
+	</style>";
+
+echo '<br/>'.$source.'<br>'.$encoded.'<br>';
+echo $source_size.' / '.$enc_size.' = '.$source_size/$enc_size.'<br/>';
+echo 'Compression: ' . (100 - 100*$enc_size/$source_size) . '%<br/>';
 echo '<hr>';
-echo $codingTree->dump();
+
