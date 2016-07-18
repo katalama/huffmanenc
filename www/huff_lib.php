@@ -87,11 +87,13 @@ function getCodingTree(array $frequencyTable ) {
 }
     
 function getCodingTable($root, $code = '') {
-	if (!$root->left && !$root->right)
+	// recurrent stop
+	if (!$root->left && !$root->right) {
 		return [$root->token => [
-			'code' => ($code===''? 1 : bindec($code)), 
+			'code' => (''===$code? 1 : bindec($code)), 
 			'bits'=>strlen($code)?:1]
 		];
+	}
 	
 	return getCodingTable($root->left, $code.'1') + getCodingTable($root->right, $code.'0');
 }
@@ -107,6 +109,43 @@ function encode($data, $codingTable){
 	);
 }
 
-function encodeString($string) {
-	return encode($string, getCodingTable(getCodingTree(getFrequencyTable($string))));
+function restoreCodingTree($codingTable, $depth = 1) {
+	$rootNode = new HuffmanNode();
+
+	if (count($codingTable)==1){
+		$rootNode->token = array_keys($codingTable)[0];
+		return $rootNode;
+	}
+	
+	$leftPart = $rightPart = [];
+	foreach ($codingTable as $key=>$entity) {
+		if ( ($entity['code'] >> ($entity['bits']-$depth)) & 0x1 ) {
+			$leftPart[$key] = $entity;
+		}
+		else {
+			$rightPart[$key] = $entity;
+	}
+
+	$rootNode->left = restoreCodingTree($leftPart, $depth + 1);
+	$rootNode->right = restoreCodingTree($rightPart, $depth + 1);
+	
+	return $rootNode;
+}
+
+function decode($encoded, $codingTable) {
+	$rootNode = restoreCodingTree($codingTable);
+	$decoded = '';
+	
+	for($node = $rootNode, $i=0; $i<strlen($encoded); $i++) {
+		if ($node->token !== null) {
+			$decoded .= $node->token;
+			$node = $rootNode;
+		}
+		
+		$node = ('1'===$encoded[$i]) ? $node->left : $node->right;
+	}
+	
+	$decoded .= $node->token;
+	
+	return $decoded;
 }
