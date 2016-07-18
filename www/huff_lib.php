@@ -43,16 +43,19 @@ function getFrequencyTable( $source ) {
 	return array_count_values(str_split($source));
 }
 
-function getLeast($list1, $list2){
+function getLeast(ArrayIterator $list1, ArrayIterator $list2){
 	$item1 = $list1->current(); 
 	$item2 = $list2->current();
 	
-	if (!$item1) 
+	if (!$item1) {
 		$source = $list2;
-	elseif (!$item2) 
+	}
+	elseif (!$item2) {
 		$source = $list1;
-	else 
+	}
+	else {
 		$source = ($item1->value <= $item2->value) ? $list1 : $list2;
+	}
 
 	$least = $source->current();
 	$source->next();
@@ -60,23 +63,26 @@ function getLeast($list1, $list2){
 	return $least;
 }
 
-function getCodingTree( $frequencyTable ) {
+function getCodingTree(array $frequencyTable ) {
 	asort($frequencyTable);
 	
 	$nodes = new ArrayIterator();
 	$leaves = new ArrayIterator();
 	
-	foreach ($frequencyTable as $key=>$value)
+	foreach ($frequencyTable as $key=>$value) {
 		$leaves->append(new HuffmanNode($key, $value));
+	}
 	
 	while (true) {
 		$firstNode = getLeast($nodes, $leaves);
 		$secondNode = getLeast($nodes, $leaves);
 
-		if ($secondNode) 
+		if ($secondNode) {
 			$nodes->append($firstNode->combine($secondNode));
-		else 
+		}
+		else {
 			return $firstNode;
+		}
 	}
 }
     
